@@ -1,0 +1,100 @@
+"""
+Async HTTP client for Wazuh Manager API.
+"""
+
+import logging
+import time
+from typing import Any, Dict, List, Optional
+
+import httpx
+
+from .config import WazuhConfig
+
+logger = logging.getLogger(__name__)
+
+
+class WazuhClient:
+    """Async HTTP client for Wazuh Manager API."""
+
+    def __init__(self, config: WazuhConfig) -> None:
+        self.config = config
+        self._token: Optional[str] = None
+        self._expiry: float = 0.0
+        self._basic = (config.username, config.password)
+        self._client = httpx.AsyncClient(
+            base_url=config.url,
+            verify=config.ssl_verify,
+            timeout=config.timeout,
+            http2=True,
+        )
+
+    async def _refresh_token(self) -> None:
+        """Refresh JWT token if needed."""
+        if self._token and self._expiry - time.time() > 60:
+            return
+
+        try:
+            response = await self._client.post("/security/user/authenticate", auth=self._basic)
+            response.raise_for_status()
+            data = response.json()
+            self._token = data["data"]["token"]
+            self._expiry = time.time() + 900  # 15 minutes
+            logger.debug("New JWT token obtained (expires in %d seconds)", 900)
+        except httpx.HTTPStatusError as e:
+            logger.error("Failed to authenticate with Wazuh: %s", e)
+            raise
+        except Exception as e:
+            logger.error("Unexpected error during authentication: %s", e)
+            raise
+
+    async def request(self, method: str, url: str, **kwargs) -> httpx.Response:
+        """Make authenticated request to Wazuh API."""
+        await self._refresh_token()
+
+        headers = kwargs.pop("headers", {})
+        headers["Authorization"] = f"Bearer {self._token}"
+
+        try:
+            response = await self._client.request(method, url, headers=headers, **kwargs)
+            response.raise_for_status()
+            return response
+        except httpx.HTTPStatusError as e:
+            logger.error("Wazuh API request failed: %s %s - %s", method, url, e)
+            raise
+        except Exception as e:
+            logger.error("Unexpected error during request: %s", e)
+            raise
+
+    async def authenticate(self) -> Dict[str, Any]:
+        """Force token refresh and return status."""
+        self._token = None  # Force refresh
+        await self._refresh_token()
+        return {"status": "authenticated", "token_expiry": self._expiry}
+
+    async def get(self, url: str, **kwargs) -> httpx.Response:
+        """Make GET request."""
+        return await self.request("GET", url, **kwargs)
+
+    async def post(self, url: str, **kwargs) -> httpx.Response:
+        """Make POST request."""
+        return await self.request("POST", url, **kwargs)
+
+    async def put(self, url: str, **kwargs) -> httpx.Response:
+        """Make PUT request."""
+        return await self.request("PUT", url, **kwargs)
+
+    async def delete(self, url: str, **kwargs) -> httpx.Response:
+        """Make DELETE request."""
+        return await self.request("DELETE", url, **kwargs)
+
+    async def close(self) -> None:
+        """Close the HTTP client."""
+        await self._client.aclose()
+
+    async def __aenter__(self):
+        """Async context manager entry."""
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """Async context manager exit."""
+        await self.close()
