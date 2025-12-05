@@ -1,7 +1,10 @@
 [project]
 name = "wazuh-mcp"
 version = "0.1.0"
-description = "Add your description here"
+
+description = "Model Context Protocol(MCP) server for Wazuh(SIEM)"
+author = "Arfan Abid"
+
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
