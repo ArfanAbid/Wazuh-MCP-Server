@@ -81,9 +81,9 @@ class WazuhMCPServer:
         logger.info("Wazuh URL: %s", self.config.wazuh.url)
         logger.info("SSL Verify: %s", self.config.wazuh.ssl_verify)
 
-        # Start server with SSE transport
+        # Start server with HTTP(Streamable) transport
         uvicorn.run(
-            self.app.sse_app,
+            self.app.http_app,
             host=host,
             port=port,
             log_level=self.config.server.log_level.lower(),
@@ -104,18 +104,3 @@ def create_server(config: Config = None) -> WazuhMCPServer:
     config.setup_logging()
 
     return WazuhMCPServer(config)
-
-if __name__ == "__main__":
-    print("=" * 60)
-    print("Starting Wazuh MCP Server...")
-    print("=" * 60)
-    
-    try:
-        server = create_server()
-        server.start()
-    except KeyboardInterrupt:
-        print("\n\n👋 Server stopped by user")
-    except Exception as e:
-        print(f"\n Error starting server: {e}")
-        import traceback
-        traceback.print_exc()
