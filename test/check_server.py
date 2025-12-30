@@ -41,7 +41,7 @@ if __name__ == "__main__":
     asyncio.run(test_server_connection())
 
 
-
+# uv run python -m test.check_server
 
 
 

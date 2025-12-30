@@ -81,9 +81,9 @@ class WazuhMCPServer:
         logger.info("Wazuh URL: %s", self.config.wazuh.url)
         logger.info("SSL Verify: %s", self.config.wazuh.ssl_verify)
 
-        # Start server with HTTP(Streamable) transport
+        # Start server with sse transport
         uvicorn.run(
-            self.app.http_app,
+            self.app.sse_app,
             host=host,
             port=port,
             log_level=self.config.server.log_level.lower(),
