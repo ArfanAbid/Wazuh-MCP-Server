@@ -1,6 +1,5 @@
 """
 FastAPI Chat Interface for Wazuh MCP Server
-Now using Groq for ultra-fast responses with direct tool calling!
 """
 
 import os
@@ -60,6 +59,10 @@ When answering questions:
 2. Provide clear, concise answers
 3. If data is missing or tools fail, explain what went wrong
 4. Format responses in a user-friendly way
+
+IMPORTANT:
+Please provide the correct tool arguments exactly as expected by the tool schema.
+Ensure all required fields are included and formatted properly.
 
 Available information you can retrieve:
 - Agent status and information
@@ -174,7 +177,7 @@ async def startup_event():
         
         print("🧠 Initializing Groq AI (Llama 3.1 70B)...")
         llm = ChatGroq(
-            model="llama-3.3-70b-versatile",
+            model="openai/gpt-oss-120b",
             api_key=groq_key,
             temperature=0,
             max_tokens=4096
