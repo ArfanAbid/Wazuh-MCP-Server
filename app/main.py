@@ -1,5 +1,5 @@
 """
-FastAPI Chat Interface for Wazuh MCP Server
+FastAPI Chat Interface for Wazuh MCP Server with OpenAI GPT
 """
 
 import os
@@ -9,7 +9,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from langchain_core.tools import BaseTool
-from langchain_groq import ChatGroq
+from langchain_openai import ChatOpenAI
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from pydantic import BaseModel
 from dotenv import load_dotenv
@@ -17,7 +17,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 app = FastAPI(
-    title="Wazuh Chat API for Wazuh SIEM(MCP Server)",
+    title="Wazuh Chat API for Wazuh SIEM (MCP Server)",
     description="Chat interface for Wazuh SIEM using natural language",
     version="2.0.0"
 )
@@ -39,7 +39,7 @@ class ChatRequest(BaseModel):
     """Request model for chat endpoint"""
     message: str
     session_id: Optional[str] = "default"
-    model: Optional[str] = "llama-3.3-70b-versatile"
+    model: Optional[str] = "gpt-4o-mini"
 
 
 class ChatResponse(BaseModel):
@@ -50,28 +50,23 @@ class ChatResponse(BaseModel):
     model_used: Optional[str] = None
 
 
+SYSTEM_PROMPT = """You are a Wazuh SIEM security assistant. Provide concise, actionable responses.
 
-SYSTEM_PROMPT = """You are a helpful assistant for the Wazuh SIEM platform. 
-You have access to various tools to query and analyze security data.
+RULES:
+1. Use tools to fetch real-time data - never guess or assume
+2. Be direct and brief - security teams value efficiency
+3. Format data clearly: use bullets for lists, tables for comparisons
+4. If a tool fails, state it plainly and suggest alternatives
+5. For urgent issues (critical alerts, active threats), prioritize those first
 
-When answering questions:
-1. Use the available tools to get real-time data from Wazuh
-2. Provide clear, concise answers
-3. If data is missing or tools fail, explain what went wrong
-4. Format responses in a user-friendly way
+AVAILABLE CAPABILITIES:
+- Agent monitoring (status, configuration, OS details)
+- Alert analysis (severity, rules, trends)
+- Vulnerability assessment
+- Security compliance (SCA checks)
+- System inventory (packages, processes, ports)
 
-IMPORTANT:
-Please provide the correct tool arguments exactly as expected by the tool schema.
-Ensure all required fields are included and formatted properly.
-
-Available information you can retrieve:
-- Agent status and information
-- Security alerts
-- Vulnerability scans
-- SCA (Security Configuration Assessment) results
-- System inventory data
-
-When you need to use a tool, the system will automatically execute it for you."""
+Respond in 2-3 sentences unless detailed analysis is requested."""
 
 
 async def run_agent_loop(message: str, max_iterations: int = 10) -> Dict[str, Any]:
@@ -149,16 +144,15 @@ async def run_agent_loop(message: str, max_iterations: int = 10) -> Dict[str, An
 
 @app.on_event("startup")
 async def startup_event():
-    """Initialize MCP client and Groq model on startup"""
+    """Initialize MCP client and OpenAI GPT model on startup"""
     global llm, tools, mcp_client
     
     try:
-        # Check for Groq API key
-        groq_key = os.getenv("GROQ_API_KEY")
-        if not groq_key:
+        openai_key = os.getenv("OPENAI_API_KEY")
+        if not openai_key:
             raise ValueError(
-                "GROQ_API_KEY environment variable not set. "
-                "Get your free key from: https://console.groq.com/"
+                "OPENAI_API_KEY environment variable not set. "
+                "Get your key from: https://platform.openai.com/api-keys"
             )
         
         print("🚀 Connecting to Wazuh MCP Server...")
@@ -175,16 +169,16 @@ async def startup_event():
         for tool in tools:
             print(f"  - {tool.name}: {tool.description}")
         
-        print("🧠 Initializing Groq AI (Llama 3.1 70B)...")
-        llm = ChatGroq(
-            model="openai/gpt-oss-120b",
-            api_key=groq_key,
+        print("🧠 Initializing OpenAI GPT-4o-mini...")
+        llm = ChatOpenAI(
+            model="gpt-4o-mini",
+            api_key=openai_key,
             temperature=0,
-            max_tokens=4096
+            max_tokens=2048
         )
         
-        print("✓ Groq Model initialized successfully")
-        print("⚡ Ready for ultra-fast responses!")
+        print("✓ OpenAI GPT Model initialized successfully")
+        print("⚡ Ready for intelligent responses!")
         
     except Exception as e:
         print(f"✗ Failed to initialize: {e}")
@@ -196,11 +190,11 @@ async def root():
     """Health check endpoint"""
     return {
         "status": "online",
-        "service": "Wazuh Chat API (Groq-Powered)",
-        "ai_provider": "Groq",
+        "service": "Wazuh Chat API (OpenAI-Powered)",
+        "ai_provider": "OpenAI GPT",
         "mcp_connected": mcp_client is not None,
         "agent_ready": llm is not None,
-        "speed": "⚡ Ultra-fast (500+ tokens/sec)"
+        "model": "gpt-4o-mini"
     }
 
 
@@ -213,17 +207,16 @@ async def health():
     return {
         "status": "healthy",
         "mcp_server": "http://127.0.0.1:8000",
-        "ai_provider": "Groq",
+        "ai_provider": "OpenAI GPT",
         "tools_available": len(tools)
     }
-
 
 
 @app.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
     """
     Main chat endpoint - send natural language queries about Wazuh
-    Now powered by Groq for ultra-fast responses!
+    Powered by OpenAI GPT for intelligent responses!
     
     Example requests:
     - "Show me all active agents"
@@ -242,7 +235,7 @@ async def chat(request: ChatRequest):
         return ChatResponse(
             response=result.get("output", "No response generated"),
             tool_calls=result.get("tool_calls", []),
-            model_used=request.model or "llama-3.1-70b-versatile"
+            model_used=request.model or "gpt-4o-mini"
         )
         
     except Exception as e:
@@ -280,14 +273,14 @@ async def list_tools():
 if __name__ == "__main__":
     import uvicorn
     
-    if not os.getenv("GROQ_API_KEY"):
-        print("⚠️  GROQ_API_KEY not set!")
-        print("Get your free key from: https://console.groq.com/")
-        print("Set it with: export GROQ_API_KEY='gsk_...'")
+    if not os.getenv("OPENAI_API_KEY"):
+        print("⚠️  OPENAI_API_KEY not set!")
+        print("Get your key from: https://platform.openai.com/api-keys")
+        print("Set it with: export OPENAI_API_KEY='sk-...'")
         exit(1)
     
-    print("Starting Wazuh Chat API (Groq-Powered)...")
-    print("⚡ Ultra-fast responses with Groq!")
+    print("Starting Wazuh Chat API (OpenAI GPT-Powered)...")
+    print("⚡ Intelligent responses with GPT-4o-mini!")
     print("Docs available at: http://127.0.0.1:8001/docs")
     
     uvicorn.run(app, host="127.0.0.1", port=8001, log_level="info")
