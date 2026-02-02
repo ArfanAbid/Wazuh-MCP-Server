@@ -39,7 +39,7 @@ class ChatRequest(BaseModel):
     """Request model for chat endpoint"""
     message: str
     session_id: Optional[str] = "default"
-    model: Optional[str] = "gpt-4o-mini"
+    model: Optional[str] = "gpt-4o"
 
 
 class ChatResponse(BaseModel):
@@ -169,9 +169,9 @@ async def startup_event():
         for tool in tools:
             print(f"  - {tool.name}: {tool.description}")
         
-        print("🧠 Initializing OpenAI GPT-4o-mini...")
+        print("🧠 Initializing OpenAI GPT-4o...")
         llm = ChatOpenAI(
-            model="gpt-4o-mini",
+            model="gpt-4o",
             api_key=openai_key,
             temperature=0,
             max_tokens=2048
@@ -235,7 +235,7 @@ async def chat(request: ChatRequest):
         return ChatResponse(
             response=result.get("output", "No response generated"),
             tool_calls=result.get("tool_calls", []),
-            model_used=request.model or "gpt-4o-mini"
+            model_used=request.model or "gpt-4o"
         )
         
     except Exception as e:
@@ -280,7 +280,7 @@ if __name__ == "__main__":
         exit(1)
     
     print("Starting Wazuh Chat API (OpenAI GPT-Powered)...")
-    print("⚡ Intelligent responses with GPT-4o-mini!")
+    print("⚡ Intelligent responses with GPT-4o!")
     print("Docs available at: http://127.0.0.1:8001/docs")
     
     uvicorn.run(app, host="127.0.0.1", port=8001, log_level="info")
