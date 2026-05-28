@@ -7,20 +7,23 @@ __author__ = "Arfan Abid"
 __license__ = "MIT"
 
 from .client import WazuhClient
-from .config import Config, ServerConfig, WazuhConfig
+from .config import Config, IndexerConfig, ServerConfig, WazuhConfig
 from .exceptions import (
     ConfigurationError,
     WazuhAPIError,
     WazuhAuthenticationError,
     WazuhMCPError,
 )
+from .indexer_client import WazuhIndexerClient
 from .server import WazuhMCPServer, create_server
 
 __all__ = [
     "WazuhClient",
+    "WazuhIndexerClient",
     "Config",
     "ServerConfig",
     "WazuhConfig",
+    "IndexerConfig",
     "WazuhMCPError",
     "WazuhAuthenticationError",
     "WazuhAPIError",

@@ -5,10 +5,42 @@ Configuration management for Wazuh MCP Server.
 import logging
 import os
 from dataclasses import dataclass, field
-from typing import List
+from typing import List, Optional
 from dotenv import load_dotenv
 
 load_dotenv()
+
+
+@dataclass
+class IndexerConfig:
+    """Configuration for the Wazuh Indexer (OpenSearch) instance."""
+
+    url: str
+    username: str
+    password: str
+    ssl_verify: bool = False
+    timeout: int = 30
+    index: str = "wazuh-alerts-4.x-*"
+
+    @classmethod
+    def from_env(cls, prefix: str = "WAZUH_INDEXER") -> "IndexerConfig":
+        return cls(
+            url=os.getenv(f"{prefix}_URL", ""),
+            username=os.getenv(f"{prefix}_USER", ""),
+            password=os.getenv(f"{prefix}_PASS", ""),
+            ssl_verify=os.getenv(f"{prefix}_SSL_VERIFY", "false").lower()
+            not in {"0", "false", "no"},
+            timeout=int(os.getenv(f"{prefix}_TIMEOUT", "30")),
+            index=os.getenv(f"{prefix}_INDEX", "wazuh-alerts-4.x-*"),
+        )
+
+    def validate(self) -> None:
+        if not self.url:
+            raise ValueError("Wazuh Indexer URL is required")
+        if not self.username:
+            raise ValueError("Wazuh Indexer username is required")
+        if not self.password:
+            raise ValueError("Wazuh Indexer password is required")
 
 
 @dataclass
@@ -81,15 +113,19 @@ class Config:
 
     wazuh: WazuhConfig
     server: ServerConfig
+    indexer: Optional[IndexerConfig] = None
 
     @classmethod
     def from_env(cls) -> "Config":
         """Create configuration from environment variables."""
-        return cls(wazuh=WazuhConfig.from_env(), server=ServerConfig.from_env())
+        indexer = IndexerConfig.from_env() if os.getenv("WAZUH_INDEXER_URL") else None
+        return cls(wazuh=WazuhConfig.from_env(), server=ServerConfig.from_env(), indexer=indexer)
 
     def validate(self) -> None:
         """Validate all configuration."""
         self.wazuh.validate()
+        if self.indexer:
+            self.indexer.validate()
 
     def setup_logging(self) -> None:
         """Setup logging configuration."""
